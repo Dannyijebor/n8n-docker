@@ -6,7 +6,7 @@ A production-ready n8n workflow automation platform deployed with Docker, featur
 
 - **Complete Stack**: n8n with PostgreSQL database and Redis queue
 - **Production Ready**: Resource limits, health checks, and monitoring
-- **Cloud Deployment**: Ready for Railway.app with one-click deployment
+- **Cloud Deployment**: Ready for free hosting on Render.com, Google Cloud Run, and other platforms
 - **Secure Configuration**: Environment-based secrets management
 - **Scalable**: Multi-worker architecture with queue processing
 - **Development Friendly**: Local development with Docker Compose
@@ -35,17 +35,32 @@ Copy and customize the environment file:
 cp .env .env.local
 ```
 
-**⚠️ IMPORTANT**: Update these critical security settings in `.env`:
+**⚠️ SECURITY SETUP REQUIRED**: You must configure secure credentials:
 
 ```bash
-# Change these default passwords!
-POSTGRES_PASSWORD=your-secure-postgres-password
-POSTGRES_NON_ROOT_PASSWORD=your-secure-n8n-password
-ENCRYPTION_KEY=your-32-character-encryption-key
+# REPLACE THESE WITH YOUR OWN SECURE PASSWORDS!
+POSTGRES_PASSWORD=your-secure-24char-password
+POSTGRES_NON_ROOT_PASSWORD=your-secure-24char-password  
+ENCRYPTION_KEY=your-secure-32char-encryption-key
 
-# For local development
+# Webhook URL (update for production)
 WEBHOOK_URL=http://localhost:5678
 ```
+
+**🔐 Generate Secure Credentials**:
+```bash
+# Generate strong PostgreSQL passwords (24+ characters)
+openssl rand -base64 32 | tr -d "=+/" | cut -c1-24
+
+# Generate secure encryption key (32+ characters)  
+openssl rand -base64 48 | tr -d "=+/" | cut -c1-32
+```
+
+**🔒 Security Features Implemented**:
+- Strong random passwords (24+ characters) for database access
+- Secure encryption key (32+ characters) for n8n data protection
+- File permissions set to 600 for `.env` (owner read-write only)
+- Environment variables protected from version control via `.gitignore`
 
 ### 3. Start the Stack
 
@@ -67,10 +82,8 @@ n8n/
 ├── .env                     # Environment variables (gitignored)
 ├── .gitignore              # Git ignore rules
 ├── init-data.sh            # PostgreSQL initialization
-├── railway.json            # Railway deployment config
-├── deployment-options.md   # Platform comparison guide
-└── docs/
-    ├── RAILWAY_DEPLOYMENT.md  # Railway setup guide
+└── docs/                   # Documentation directory
+    ├── deployment-options.md  # Free hosting alternatives guide
     └── tasks.md              # Improvement roadmap
 ```
 
@@ -87,11 +100,11 @@ n8n/
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `POSTGRES_PASSWORD` | PostgreSQL admin password | `ranma` ⚠️ |
-| `POSTGRES_NON_ROOT_PASSWORD` | n8n database user password | `ranma` ⚠️ |
-| `ENCRYPTION_KEY` | n8n data encryption key | `changeEncryptionKey` ⚠️ |
+| Variable | Description | Security Status |
+|----------|-------------|----------------|
+| `POSTGRES_PASSWORD` | PostgreSQL admin password | 🔐 Must set secure 24+ char password |
+| `POSTGRES_NON_ROOT_PASSWORD` | n8n database user password | 🔐 Must set secure 24+ char password |
+| `ENCRYPTION_KEY` | n8n data encryption key | 🔐 Must set secure 32+ char key |
 | `WEBHOOK_URL` | Public webhook URL | `http://localhost:5678` |
 
 ### Health Checks
@@ -108,29 +121,124 @@ Resource limits are configured for all containers:
 - Memory limits ensure stable operation
 - Restart policies handle failures gracefully
 
+### Data Persistence & Backup
+
+**Redis Persistence**: Configured with AOF (Append Only File) and RDB snapshots:
+- AOF sync every second for durability
+- RDB snapshots at 900s/1 change, 300s/10 changes, 60s/10000 changes
+- Data persisted to `redis_storage` Docker volume
+
+**PostgreSQL Persistence**: All data stored in `db_storage` Docker volume with automatic backups
+
+## 💾 Backup & Restore
+
+### Automated Backup Scripts
+
+The setup includes comprehensive backup scripts in the `scripts/` directory:
+
+#### PostgreSQL Backup
+```bash
+# Manual backup
+./scripts/backup-postgres.sh
+
+# Automated daily backups (2 AM)
+./scripts/setup-backup-cron.sh
+```
+
+**Features**:
+- Creates compressed SQL dumps with timestamps
+- Automatically cleans up old backups (keeps 7 most recent)
+- Configurable backup retention and directories
+- Logs backup size and completion status
+- **Execution Logging**: All backup operations logged to timestamped log files
+
+#### Redis Backup
+```bash
+# Manual backup
+./scripts/backup-redis.sh
+```
+
+**Features**:
+- Backs up both RDB and AOF files
+- Triggers BGSAVE for consistent snapshots
+- Compressed storage with automatic cleanup
+- Preserves Redis persistence data
+- **Execution Logging**: All backup operations logged to timestamped log files
+
+#### Complete Backup
+```bash
+# Backup both PostgreSQL and Redis
+./scripts/backup-all.sh
+```
+
+**Features**:
+- Coordinates both PostgreSQL and Redis backups
+- **Execution Logging**: All master backup operations logged to timestamped log files
+
+### Backup Logging
+
+All backup scripts now include comprehensive execution logging:
+
+**Log Files Created**:
+- `backup-postgres_YYYYMMDD_HHMMSS.log` - PostgreSQL backup execution log
+- `backup-redis_YYYYMMDD_HHMMSS.log` - Redis backup execution log  
+- `backup-all_YYYYMMDD_HHMMSS.log` - Master backup script execution log
+- `setup-backup-cron_YYYYMMDD_HHMMSS.log` - Cron setup execution log
+
+**Log Content**:
+- Timestamped entries with `[YYYY-MM-DD HH:MM:SS]` format
+- All backup status messages and progress updates
+- Success/failure notifications and error details
+- Backup file sizes and cleanup operations
+- Complete execution trail for troubleshooting
+
+**Benefits**:
+- **Verification**: Confirm backup execution and success status
+- **Troubleshooting**: Detailed error logs for failed backups
+- **Monitoring**: Track backup performance and file sizes
+- **Audit Trail**: Complete history of backup operations
+
+### Restore Procedures
+
+#### PostgreSQL Restore
+```bash
+# List available backups
+./scripts/restore-postgres.sh
+
+# Restore latest backup
+./scripts/restore-postgres.sh latest
+
+# Restore specific backup
+./scripts/restore-postgres.sh backups/n8n_backup_20250810_140000.sql.gz
+```
+
+**Restore Process**:
+1. Automatically stops n8n services to prevent conflicts
+2. Restores database from compressed or uncompressed backups  
+3. Restarts n8n services after successful restore
+4. Provides confirmation prompts for safety
+
+#### Backup Storage
+
+```
+backups/              # Backup directory
+├── n8n_backup_20250810_140000.sql.gz      # PostgreSQL dumps
+├── n8n_backup_20250810_120000.sql.gz      # PostgreSQL dumps  
+├── redis_backup_20250810_140000.rdb.gz    # Redis RDB snapshots
+├── redis_backup_20250810_140000.aof.gz    # Redis AOF files
+├── backup-postgres_20250810_140000.log    # PostgreSQL backup logs
+├── backup-redis_20250810_140000.log       # Redis backup logs
+├── backup-all_20250810_140000.log         # Master backup logs
+└── setup-backup-cron_20250810_140000.log  # Cron setup logs
+```
+
 ## ☁️ Cloud Deployment
 
-### Railway.app (Recommended)
+For detailed deployment instructions on free hosting platforms, see:
 
-Deploy to Railway.app for a free, production-ready hosting solution:
+📚 **[Complete Deployment Guide](docs/render-deployment.md)** - Step-by-step instructions for deploying on Render.com (completely free)
 
-1. **Quick Deploy**: [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new)
-
-2. **Manual Setup**: See [Railway Deployment Guide](docs/RAILWAY_DEPLOYMENT.md)
-
-**Benefits:**
-- $5/month free tier
-- Automatic HTTPS & custom domains
-- Built-in PostgreSQL & Redis
-- No service sleeping
-- Professional webhook URLs
-
-### Other Platforms
-
-See [deployment-options.md](deployment-options.md) for alternatives:
-- Render.com (750 hours/month free)
-- Fly.io ($5 monthly credits)
-- Google Cloud Run (2M requests/month)
+Additional free platforms covered in [docs/deployment-options.md](docs/deployment-options.md)
 
 ## 🔒 Security Considerations
 
@@ -196,7 +304,7 @@ docker stats
 
 - **[n8n Documentation](https://docs.n8n.io/)** - Official n8n guides
 - **[Docker Compose Reference](https://docs.docker.com/compose/)** - Docker configuration help
-- **[Railway Documentation](https://docs.railway.app/)** - Deployment platform docs
+- **[Render Documentation](https://render.com/docs)** - Free hosting platform docs
 - **[PostgreSQL Tuning](https://wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server)** - Database optimization
 - **[Tasks & Improvements](docs/tasks.md)** - Prioritized enhancement roadmap
 
