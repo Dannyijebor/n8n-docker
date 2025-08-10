@@ -133,3 +133,6 @@ __pycache__/
 # Backup directories
 backups/
 dumps/
+
+# PostgreSQL data directory
+postgres_data/
