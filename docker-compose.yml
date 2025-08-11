@@ -9,7 +9,7 @@ volumes:
   redis_storage:
 
 x-shared: &shared
-  restart: always
+  restart: unless-stopped
   image: docker.n8n.io/n8nio/n8n
   environment:
     - DB_TYPE=postgresdb
@@ -47,11 +47,16 @@ x-shared: &shared
       reservations:
         cpus: '0.25'
         memory: 128M
+    restart_policy:
+      condition: on-failure
+      delay: 15s
+      max_attempts: 3
+      window: 120s
 
 services:
   postgres:
     image: postgres:16
-    restart: always
+    restart: unless-stopped
     environment:
       - POSTGRES_USER
       - POSTGRES_PASSWORD
@@ -76,10 +81,15 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 120s
 
   redis:
     image: redis:6-alpine
-    restart: always
+    restart: unless-stopped
     command: redis-server --appendonly yes --appendfsync everysec --save 900 1 --save 300 10 --save 60 10000
     volumes:
       - redis_storage:/data
@@ -98,6 +108,11 @@ services:
         reservations:
           cpus: '0.1'
           memory: 64M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 10
+        window: 120s
 
   n8n:
     <<: *shared
