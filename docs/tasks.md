@@ -16,8 +16,8 @@ This document contains actionable improvement tasks for the n8n Docker setup, **
 *Tasks that ensure system stability and enhance security posture*
 
 7. [x] Add resource limits (CPU, memory) for all Docker containers
-8. [ ] Configure container health checks for n8n services
-9. [ ] Implement proper service discovery instead of using deprecated `links`
+8. [x] Configure container health checks for n8n services
+9. [x] Implement proper service discovery instead of using deprecated `links`
 10. [ ] Configure proper restart policies with backoff strategies
 11. [ ] Add proper error handling and retry logic in init-data.sh script
 12. [ ] Implement secrets management using Docker Secrets or external secret management tools
