@@ -9,4 +9,4 @@ EXPOSE 10000
 
 # Explicitly define the startup command to bypass entrypoint issues
 ENTRYPOINT ["n8n"]
-CMD ["start"
+CMD ["start"]
