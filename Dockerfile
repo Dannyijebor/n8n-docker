@@ -3,11 +3,10 @@ FROM n8nio/n8n:latest
 # Set working directory
 WORKDIR /home/node
 
-# Copy any custom configuration files if needed
-# COPY custom-config/ /home/node/.n8n/
+# Expose the n8n port (Render defaults to 10000)
+ENV N8N_PORT=10000
+EXPOSE 10000
 
-# Expose the n8n port
-EXPOSE 5678
-
-# Use the default n8n entrypoint and command
-CMD ["n8n"]
+# Explicitly define the startup command to bypass entrypoint issues
+ENTRYPOINT ["n8n"]
+CMD ["start"]
